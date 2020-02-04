@@ -16,7 +16,7 @@ func main() {
 	//initializing time measurement
 	start := time.Now()
 	//joining command-line arguments via strings package, passed into empty variable at end
-	fmt.Println(strings.Join(os.Args[1:], " "))
+	fmt.Println(strings.Join(os.Args, " "))
 	//measuring operation runtime
 	fmt.Printf("%.2fs elasped\n", time.Since(start).Seconds())
 }
