@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,10 @@ func main() {
 	start := time.Now()
 	//fetch url
 	for _, url := range os.Args[1:] {
+		//add http is missing from argument
+		if !strings.HasPrefix(url, "http://") {
+			url = "http://" + url
+		}
 		resp, err := http.Get(url)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fetch: %v\n", err)
@@ -27,13 +32,14 @@ func main() {
 			fmt.Fprintf(os.Stderr, "fetch: reading %s: %v\n", url, err)
 			os.Exit(1)
 		}
-		//copy and read url data
+		//copy & read url data
 		doc, err := io.Copy(ioutil.Discard, resp.Body)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "fetch: reading %s: %v\n", b, err)
-
+			fmt.Fprintf(os.Stderr, "fetch: reading %s %v\n", b, err)
 		}
-		fmt.Printf("%s", doc)
+		//print all desired outputs, of url data, of http status, of runtime
+		fmt.Printf("%s\n", doc)
+		fmt.Printf("http status of current operation: %s\n", resp.Status)
 		fmt.Printf("%.2fs elasped\n", time.Since(start).Seconds())
 
 	}
