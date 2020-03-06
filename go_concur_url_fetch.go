@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,41 +16,37 @@ func main() {
 	start := time.Now()
 	//receive-channel
 	ch := make(chan string)
-	//send-channel
-	sendCh := make(chan string)
+	//error channel/print output
+	errCh := make(chan string)
+	//done channel/unblocks main function
+	done := make(chan bool)
 	//user input
 	for _, url := range os.Args[1:] {
-		go fetch(url, ch) //start a go routine
+		go fetch(url, ch, errCh) //start a go routine
 	}
-
-	//channel direction
-	receiveCh(ch, sendCh)
-	//
-	//prints output
-	//wont need print out
-	for range os.Args[1:] {
-		fmt.Println(<-ch) //receive from channel ch
-
-	}
+	//values of ch
+	v := <-ch
+	//values of errCh
+	errV := <-errCh
 
 	fmt.Printf(".%2fs elasped\n", time.Since(start).Seconds()) //runtime
 }
 
 //fetch url logic
-func fetch(url string, ch chan<- string) {
+func fetch(url string, ch chan<- string, errCh chan<- string) {
 	//timer
 	start := time.Now()
 	//fetch url
 	resp, err := http.Get(url)
 	if err != nil {
-		ch <- fmt.Sprint(err) //send to channel ch
+		errCh <- fmt.Sprint(err) //send to channel ch
 		return
 	}
 	//read url/close read
 	nbytes, err := io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		ch <- fmt.Sprintf("while reading %s: %v", url, err) //send to channel ch
+		errCh <- fmt.Sprintf("while reading %s: %v", url, err) //send to channel ch
 		return
 	}
 	secs := time.Since(start).Seconds()                  //individual url runtime
@@ -59,36 +54,20 @@ func fetch(url string, ch chan<- string) {
 }
 
 //write channel to file
-func writeFile(sendCh chan<- string, path string, ch chan<- string) {
-	f, err := os.OpenFile("test.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+func writeFile(v string, errCh chan<- string, done chan bool) {
+	f, err := os.OpenFile("test.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0664)
 	if err != nil {
-		ch <- fmt.Sprintf("while opening %s: %v", f, err)
+		errCh <- fmt.Sprintf("while opening %s: %v", f, err)
 		return
 	}
 	defer f.Close() //close file;don't leak data
 	//writer w/ buffer
-	w := bufio.NewWriter(f)
-	//read over all lines
-	for line := range  {
+	for d := range v {
+		_, err := fmt.Sprintf(f, d)
+		err <- v
+		if err != nil {
 
+		}
 	}
 
 }
-func receiveCh(ch <-chan string, chSend chan<- string) {
-	data := <-ch
-	chSend <- data
-}
-
-//func writeFile(string <-chan ch) {
-
-//open file
-//f, err := os.Open("/home/justine/Desktop/goprojs/test.txt")
-//if err != nil {
-//	ch <- fmt.Sprintf("opening: %v\n", f, err)
-//	f.Close()
-//	return
-//}
-//for d := range ch {
-//	_, err = fmt.Fprintln(f, d)
-//}
-//}
