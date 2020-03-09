@@ -61,12 +61,12 @@ func writeFile(v string, errCh chan<- string, done chan bool) {
 		return
 	}
 	defer f.Close() //close file;don't leak data
-	//writer w/ buffer
+	//write to file & pass true when done
 	for d := range v {
-		_, err := fmt.Sprintf(f, d)
-		err <- v
+		_, err := fmt.Fprintln(f, d)
+		v <- fmt.Sprintf(err)
 		if err != nil {
-
+			errCh <- fmt.Sprintf("while reading over %s: %v", v, err)
 		}
 	}
 
