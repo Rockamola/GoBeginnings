@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 )
 
 //RequestParams values
@@ -15,6 +16,7 @@ type RequestParams struct {
 	url           string
 	requestsLimit int
 	requestStatus *chan int
+	stop          *chan bool
 
 	//requests statistics
 	sucessfulRequest int64
@@ -31,10 +33,12 @@ func limitTester(URL string, requests int) (*RequestParams, error) {
 		return nil, fmt.Errorf("Undefined host or error =%v", err)
 	}
 	status := make(chan int)
+	s := make(chan bool)
 	return &RequestParams{
 		url:           URL,
 		requestsLimit: requests,
 		requestStatus: &status,
+		stop:          &s,
 	}, nil
 }
 
@@ -43,17 +47,36 @@ func (r *RequestParams) runLimits() {
 	for i := 0; i < r.requestsLimit; i++ {
 		go func() {
 			for {
-				resp, err := http.Get(r.url)
-				stat := resp.StatusCode
-				if err == nil {
-					_, _ = io.Copy(ioutil.Discard, resp.Body)
-					_ = resp.Body.Close()
-					(*r.requestStatus) <- stat
+				select {
+				case <-(*r.stop):
 					return
+				//http get requests
+				default:
+					resp, err := http.Get(r.url)
+					atomic.AddInt64(&r.amountRequests, 1)
+					if err == nil {
+						atomic.AddInt64(&r.sucessfulRequest, 1)
+						_, _ = io.Copy(ioutil.Discard, resp.Body)
+						_ = resp.Body.Close()
+						(*r.requestStatus) <- resp.StatusCode
+					}
 				}
 			}
 		}()
 	}
+}
+
+//Stops ddos once limits reached
+func (r *RequestParams) stopLimits() {
+	for i := 0; i < r.requestsLimit; i++ {
+		(*r.stop) <- true
+	}
+	close(*r.stop)
+}
+
+//Results - results of RequestParams
+func (r RequestParams) Results() (succesfulRequest, amountRequests int64, status chan<- RequestParams) {
+	return r.sucessfulRequest, r.amountRequests, r.requestStatus
 }
 
 func main() {
@@ -63,5 +86,6 @@ func main() {
 		panic(err)
 	}
 	r.runLimits()
+	r.stopLimits()
 	fmt.Println(r.requestStatus)
 }
